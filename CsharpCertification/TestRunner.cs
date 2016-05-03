@@ -17,7 +17,7 @@ namespace Chapter3
             //test1.Run();
 
             /*
-             * Input parsing 
+             * Encrption
              */
             var test2 = new EncryptionExample();
             test2.Run();

@@ -12,6 +12,7 @@ namespace Chapter3
     {
         public void Run()
         {
+            // Initialization vector has to be the same on both ends
             byte[] iv;
             using (var symAlgo = new AesManaged())
             {
@@ -19,8 +20,8 @@ namespace Chapter3
                 iv = symAlgo.IV;
             }
 
-            var bob = new MessageHolder("Bob", "Hi, I'm Bob.", iv);
-            var alice = new MessageHolder("Alice", "Hi, I'm Alice", iv);
+            var bob = new MessageHolder("Bob", "Hi Alice, I'm Bob. This is supposedly a long message. Here are some private information.", iv);
+            var alice = new MessageHolder("Alice", "Hi Bob, I'm Alice. This is supposedly another long message. Here is my personal information.", iv);
             bob.Go(alice);
             alice.Go(bob);
         }
@@ -45,12 +46,14 @@ namespace Chapter3
                     // Step 1.
                     _asymPub = rsa.ToXmlString(false);
                     _asymPriv = rsa.ToXmlString(true);
+                    Console.WriteLine("Generated asymmetric pub and priv keys for '{0}'.", _name);
                 }
                 using (var symAlgo = new AesManaged())
                 {
                     symAlgo.IV = iv;
                     symAlgo.GenerateKey();
                     _symKey = symAlgo.Key;
+                    Console.WriteLine("Generated symmetric key for '{0}'.", _name);
                 }
             }
 
@@ -58,20 +61,16 @@ namespace Chapter3
             {
                 // Step 2 + 3 + 4 send asymmetric pub key, encrypt symmetric key and send it to one another
                 var encSymkey = target.GetEncryptedSymkeyByPublicAsymKey(_asymPub);
+                Console.WriteLine("'{0}' recieved encrypted symmetric key.", _name);
 
                 // Step 5 decrypt external symmetric key and use it to encrypt message
                 var encMessage = CreateEncryptedMessage(encSymkey);
+                Console.WriteLine("'{0}' generated encrypted message using decrypted symmetric key.", _name);
 
-                // Step 5 + 6 send and decrypt
-                target.SendEncryptedMessage(encMessage);
+                // Step 5 + 6 send and target decrypts
+                target.SetEncryptedMessage(encMessage);
             }
-
-            private void SendEncryptedMessage(byte[] encMessage)
-            {
-                var msg = GetDecryptedMessage(encMessage);
-                Console.WriteLine(string.Format("'{0}' recieved message: '{1}'.", _name, msg));
-            }
-
+            
             public byte[] GetEncryptedSymkeyByPublicAsymKey(string asymPubXml)
             {
                 using (var rsa = new RSACryptoServiceProvider())
@@ -87,6 +86,7 @@ namespace Chapter3
                 {
                     rsa.FromXmlString(_asymPriv);
                     var symKey = rsa.Decrypt(encryptedSymKey, false);
+                    Console.WriteLine("'{0}' decrypted symmetric key using private asymmetric key.", _name);
 
                     using (var symAlgo = new AesManaged())
                     {
@@ -97,13 +97,15 @@ namespace Chapter3
                 }
             }
 
-            private string GetDecryptedMessage(byte[] message)
+            public void SetEncryptedMessage(byte[] message)
             {
+                Console.WriteLine(string.Format("'{0}' recieved encrypted message: '{1}'.", _name, Convert.ToBase64String(message)));
                 using (var symAlgo = new AesManaged())
                 {
                     symAlgo.Key = _symKey;
                     symAlgo.IV = _iv;
-                    return Decrypt(symAlgo, message);
+                    var msg = Decrypt(symAlgo, message);
+                    Console.WriteLine(string.Format("'{0}' found decrypted message: '{1}'.", _name, msg));
                 }
             }
 
